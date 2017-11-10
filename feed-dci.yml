@@ -1,0 +1,31 @@
+---
+- name: feed dci
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: stat feeder-dcirc.sh file
+      stat:
+        path: feeder-dcirc.sh
+      register: dci_rc_file
+
+    - name: ensure dci rc files is defined
+      fail:
+        msg: "dci_rc_file file is required"
+      when: dci_rc_file.stat.exists == False
+
+    - name: install packages
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - python-lxml
+        - python-requests
+        - python2-junit_xml
+        - dci-ansible
+        - python-dciauth
+
+    - name: download nightly rhel image
+      shell: |
+        source feeder-dcirc.sh
+        python ./download-nightly-rhel-image.py
+      register: nightly_rhel_image
