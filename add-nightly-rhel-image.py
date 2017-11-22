@@ -9,7 +9,7 @@ import sys
 from dciauth import signature
 from lxml import html
 
-from log import debug
+from log import debug, error
 
 DCI_CLIENT_ID = os.getenv('DCI_CLIENT_ID')
 DCI_API_SECRET = os.getenv('DCI_API_SECRET')
@@ -189,15 +189,19 @@ def delete_all_files_for_component(component):
             delete('components/%s/files/%s' % (component['id'], file['id']), file)
 
 
-if __name__ == '__main__':
-    config_file_url = 'http://download-node-02.eng.bos.redhat.com/nightly/latest-RHEL-7/work/image-build/Server/raw-xz_rhel-server-ec2_x86_64.cfg'
+def download_and_upload(config_file_url, topic_name):
     config = get_config(config_file_url)
     qcow2_url = get_latest_qcow2_image_url(config)
     file_name = qcow2_url.split('/')[-1]
     if not os.path.exists(file_name):
         file_name = download_file(qcow2_url, file_name)
+    upload_on_dci(file_name, qcow2_url, topic_name)
+    os.remove(file_name)
+
+
+def upload_on_dci(file_name, qcow2_url, topic_name):
     product = get_product('RHEL')
-    topic = get_or_create_topic(product, 'RHEL-7', ['qcow2'])
+    topic = get_or_create_topic(product, topic_name, ['qcow2'])
     team_id = get_my_team_id()
     associate_topic_team(topic, team_id)
     component_name = file_name.replace('.x86_64.qcow2', '')
@@ -212,4 +216,17 @@ if __name__ == '__main__':
         if iteration > 5:
             sys.exit('too many try, cannot upload %s' % file_name)
     debug('upload ok, delete %s' % file_name)
-    os.remove(file_name)
+
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        error('You need to specify the RHEL version. "%s 7" for RHEL 7' % sys.argv[0])
+        sys.exit(1)
+    configs = {
+        "7": 'http://download-node-02.eng.bos.redhat.com/nightly/latest-RHEL-7/work/image-build/Server/raw-xz_rhel-server-ec2_x86_64.cfg',
+        "8": 'http://download-node-02.eng.bos.redhat.com/nightly/latest-RHEL-8/work/image-build/Components/qcow2-raw-xz_rhel-guest-image_ppc64le-x86_64.cfg'
+    }
+    rhel_version = sys.argv[1]
+    config_file_url = configs[rhel_version]
+    topic_name = 'RHEL-%s' % rhel_version
+    download_and_upload(config_file_url, topic_name)
