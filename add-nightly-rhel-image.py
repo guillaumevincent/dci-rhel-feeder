@@ -6,7 +6,8 @@ import os
 
 import requests
 import sys
-from dciauth import signature
+from dciauth.signature import Signature
+from dciauth.request import AuthRequest
 from lxml import html
 
 from log import debug, error
@@ -22,40 +23,22 @@ def get_url(endpoint):
 
 def get(endpoint, params={}):
     url = '/api/v1/%s' % endpoint
-    headers = signature.generate_headers_with_secret(
-        secret=DCI_API_SECRET,
-        method="GET",
-        content_type='application/json',
-        url=url,
-        params=params,
-        payload={})
-    headers['DCI-Client-Info'] = DCI_CLIENT_ID
+    r = AuthRequest(endpoint=url, params=params)
+    headers = Signature(r).generate_headers('feeder', DCI_CLIENT_ID, DCI_API_SECRET)
     return requests.get(url='%s%s' % (DCI_CS_URL, url), params=params, headers=headers)
 
 
 def post(endpoint, payload, params={}):
     url = '/api/v1/%s' % endpoint
-    headers = signature.generate_headers_with_secret(
-        secret=DCI_API_SECRET,
-        method="POST",
-        content_type='application/json',
-        url=url,
-        params=params,
-        payload=payload)
-    headers['DCI-Client-Info'] = DCI_CLIENT_ID
+    r = AuthRequest(method='POST', endpoint=url, payload=payload, params=params)
+    headers = Signature(r).generate_headers('feeder', DCI_CLIENT_ID, DCI_API_SECRET)
     return requests.post(url='%s%s' % (DCI_CS_URL, url), headers=headers, json=payload)
 
 
 def delete(endpoint, data):
     url = '/api/v1/%s' % endpoint
-    headers = signature.generate_headers_with_secret(
-        secret=DCI_API_SECRET,
-        method="DELETE",
-        content_type='application/json',
-        url=url,
-        params={},
-        payload={})
-    headers['DCI-Client-Info'] = DCI_CLIENT_ID
+    r = AuthRequest(endpoint=url)
+    headers = Signature(r).generate_headers('feeder', DCI_CLIENT_ID, DCI_API_SECRET)
     headers['etag'] = data['etag']
     return requests.delete(url='%s%s' % (DCI_CS_URL, url), headers=headers)
 
@@ -63,14 +46,8 @@ def delete(endpoint, data):
 def upload_file(component, file_name):
     url = '/api/v1/components/%s/files' % component['id']
     debug('upload %s on %s%s' % (file_name, DCI_CS_URL, url))
-    headers = signature.generate_headers_with_secret(
-        secret=DCI_API_SECRET,
-        method="POST",
-        content_type='application/json',
-        url=url,
-        params={},
-        payload={})
-    headers['DCI-Client-Info'] = DCI_CLIENT_ID
+    r = AuthRequest(method='POST', endpoint=url)
+    headers = Signature(r).generate_headers('feeder', DCI_CLIENT_ID, DCI_API_SECRET)
     r = requests.post(url='%s%s' % (DCI_CS_URL, url), headers=headers, data=open(file_name, 'rb'))
     debug(r.text)
 
